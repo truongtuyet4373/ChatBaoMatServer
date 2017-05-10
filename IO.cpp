@@ -1,10 +1,14 @@
 #include "stdafx.h"
 #include "IO.h"
 
+//file nay yc giu nguyen, ko duoc sua vao
+
 int sendData(LPPER_IO_OPERATION_DATA perIoData, LPPER_HANDLE_DATA perHandleData) {
 	
 	DWORD transferredBytes;
-	
+	perIoData->sentBytes = 0;
+	perIoData->operation = SEND;
+
 	if (WSASend(perHandleData->socket,
 		&(perIoData->dataBuff),
 		1,
