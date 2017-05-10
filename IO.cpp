@@ -25,11 +25,16 @@ int recvData(LPPER_IO_OPERATION_DATA perIoData, LPPER_HANDLE_DATA perHandleData)
 
 	DWORD transferredBytes;
 	DWORD flags = 0;
-	if (WSARecv(perHandleData->socket,
-		&(perIoData->dataBuff),
-		1,
-		&transferredBytes,
-		&flags,
+
+	ZeroMemory(&(perIoData->overlapped), sizeof(OVERLAPPED));
+		perIoData->sentBytes = 0;
+		perIoData->recvBytes = 0;
+		perIoData->dataBuff.len = DATA_BUFSIZE;
+		perIoData->dataBuff.buf = perIoData->buffer;
+		perIoData->operation = RECEIVE;
+
+	if (WSARecv(perHandleData->socket,&(perIoData->dataBuff),
+		1,&transferredBytes,&flags,
 		&(perIoData->overlapped), NULL) == SOCKET_ERROR) {
 		if (WSAGetLastError() != ERROR_IO_PENDING) {
 			printf("WSARecv() failed with error %d\n", WSAGetLastError());

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <process.h>
 #include "IO.h"
+#include "processData.h"
 
 #define PORT 5500
 
@@ -91,12 +92,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			printf("GlobalAlloc() failed with error %d\n", GetLastError());
 			return 1;
 		}
-		ZeroMemory(&(perIoData->overlapped), sizeof(OVERLAPPED));
-		perIoData->sentBytes = 0;
-		perIoData->recvBytes = 0;
-		perIoData->dataBuff.len = DATA_BUFSIZE;
-		perIoData->dataBuff.buf = perIoData->buffer;
-		perIoData->operation = RECEIVE;
+		
 
 		recvData(perIoData, perHandleData);
 	}
@@ -106,32 +102,20 @@ int _tmain(int argc, _TCHAR* argv[])
 unsigned __stdcall serverWorkerThread(LPVOID completionPortID)
 {
 	HANDLE completionPort = (HANDLE)completionPortID;
-	DWORD transferredBytes;
 	LPPER_HANDLE_DATA perHandleData;
 	LPPER_IO_OPERATION_DATA perIoData;
+	DWORD transferredBytes;
 	DWORD flags;
 	while (TRUE) {
 
 		//Get Queued Status
-		if (GetQueuedCompletionStatus(completionPort,
-			&transferredBytes,
-			(LPDWORD)&perHandleData,
-			(LPOVERLAPPED *)&perIoData,
-			INFINITE) == 0) {
+		if (GetQueuedCompletionStatus(completionPort,&transferredBytes,
+			(LPDWORD)&perHandleData,(LPOVERLAPPED *)&perIoData,INFINITE) == 0) {
 			printf("GetQueuedCompletionStatus() failed with error %d\n", GetLastError());
 			return 0;
 		}
 
-		printf("\n\nAfter get: ");
-		printf("\nTransferredBytes = %d", transferredBytes);
-		printf("\nDataBuff.buf: %s\nDataBuf.len = %d", perIoData->dataBuff.buf, perIoData->dataBuff.len);
-		printf("\nPerIoData: bufLen = %d, recvBytes = %d, sentBytes = %d, operation = %d",
-			perIoData->bufLen, perIoData->recvBytes, perIoData->sentBytes, perIoData->operation);
-
-
-		// Check to see if an error has occurred on the socket and if so
-		// then close the socket and cleanup the SOCKET_INFORMATION structure
-		// associated with the socket
+		//Check if error
 		if (transferredBytes == 0 && (perIoData->operation == SEND || perIoData->operation == RECEIVE)) {
 			printf("Closing socket %d\n", perHandleData->socket);
 			if (closesocket(perHandleData->socket) == SOCKET_ERROR) {
@@ -147,65 +131,26 @@ unsigned __stdcall serverWorkerThread(LPVOID completionPortID)
 			continue;
 		}
 
-		// Check to see if the operation field equals RECEIVE. If this is so, then
-		// this means a WSARecv call just completed so update the recvBytes field
-		// with the transferredBytes value from the completed WSARecv() call
 		if (perIoData->operation == RECEIVE) {
-			//Process Data here
-			perIoData->bufLen = transferredBytes;
+			//Update buff len
 			perIoData->dataBuff.len = transferredBytes;
-			perIoData->sentBytes = 0;
-			perIoData->operation = SEND;
 
-			printf("\n\nif (perIoData->operation == RECEIVE)");
-			printf("\nTransferredBytes = %d", transferredBytes);
-			printf("\nDataBuff.buf: %s\nDataBuf.len = %d", perIoData->dataBuff.buf, perIoData->dataBuff.len);
-			printf("\nPerIoData: bufLen = %d, recvBytes = %d, sentBytes = %d, operation = %d",
-				perIoData->bufLen, perIoData->recvBytes, perIoData->sentBytes, perIoData->operation);
-			
-			sendData(perIoData, perHandleData);
+			//Process Data
+			parseArgs(perIoData, perHandleData);
 		}
 		else if (perIoData->operation == SEND) {
-			perIoData->sentBytes += transferredBytes;
+			//Update buff len
+			perIoData->dataBuff.len -= transferredBytes;
 
-			printf("\n\nif (perIoData->operation == SEND)");
-			printf("\nTransferredBytes = %d", transferredBytes);
-			printf("\nDataBuff.buf: %s\nDataBuf.len = %d", perIoData->dataBuff.buf, perIoData->dataBuff.len);
-			printf("\nPerIoData: bufLen = %d, recvBytes = %d, sentBytes = %d, operation = %d",
-				perIoData->bufLen, perIoData->recvBytes, perIoData->sentBytes, perIoData->operation);
-
-
-			if (perIoData->bufLen > perIoData->sentBytes) {
-				// Post another WSASend() request.
-				// Since WSASend() is not guaranteed to send all of the bytes requested,
-				// continue posting WSASend() calls until all bytes are sent.
+			if (perIoData->dataBuff.len > 0) {
+				//If there are bytes to send. Doan nay chua duoc kiem tra
 				ZeroMemory(&(perIoData->overlapped), sizeof(OVERLAPPED));
-				perIoData->dataBuff.buf = perIoData->buffer + perIoData->sentBytes;
-				perIoData->dataBuff.len = perIoData->bufLen - perIoData->sentBytes;
-
-				printf("\n\nif (perIoData->bufLen > perIoData->sentBytes)");
-				printf("\nTransferredBytes = %d", transferredBytes);
-				printf("\nDataBuff.buf: %s\nDataBuf.len = %d", perIoData->dataBuff.buf, perIoData->dataBuff.len);
-				printf("\nPerIoData: bufLen = %d, recvBytes = %d, sentBytes = %d, operation = %d",
-					perIoData->bufLen, perIoData->recvBytes, perIoData->sentBytes, perIoData->operation);
+				perIoData->dataBuff.buf += transferredBytes;
 
 				sendData(perIoData, perHandleData);
 			}
 			else {
 				// No more bytes to send post another WSARecv() request
-				perIoData->recvBytes = 0;
-				perIoData->operation = RECEIVE;
-				ZeroMemory(&(perIoData->overlapped), sizeof(OVERLAPPED));
-				perIoData->dataBuff.len = DATA_BUFSIZE;
-				perIoData->dataBuff.buf = perIoData->buffer;
-				
-				printf("\n\nNo more bytes to send post another WSARecv() request");
-				printf("\nTransferredBytes = %d", transferredBytes);
-				printf("\nDataBuff.buf: %s\nDataBuf.len = %d", perIoData->dataBuff.buf, perIoData->dataBuff.len);
-				printf("\nPerIoData: bufLen = %d, recvBytes = %d, sentBytes = %d, operation = %d",
-					perIoData->bufLen, perIoData->recvBytes, perIoData->sentBytes, perIoData->operation);
-
-
 				recvData(perIoData, perHandleData);
 			}
 		}

@@ -13,7 +13,6 @@ typedef struct {
 	WSAOVERLAPPED overlapped;
 	WSABUF dataBuff;
 	CHAR buffer[DATA_BUFSIZE];
-	int bufLen;
 	int recvBytes;
 	int sentBytes;
 	int operation;
