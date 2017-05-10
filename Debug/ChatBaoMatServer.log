@@ -1,0 +1,4 @@
+﻿  ChatBaoMatServer.cpp
+e:\visualstudioprojects\chatbaomat\chatbaomatserver\chatbaomatserver.cpp(112): warning C4101: 'flags': unreferenced local variable
+  ChatBaoMatServer.vcxproj -> E:\VisualStudioProjects\ChatBaoMat\Debug\ChatBaoMatServer.exe
+  ChatBaoMatServer.vcxproj -> E:\VisualStudioProjects\ChatBaoMat\Debug\ChatBaoMatServer.pdb (Full PDB)
